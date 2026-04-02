@@ -1,8 +1,9 @@
 import { BrowserSession } from "./browser.js";
 import { createTools } from "./1-tools.js";
 import { createContext } from "./3-context.js";
-import { defaultGuardrails } from "./4-guardrails.js";
+import { combineGuardrails, defaultGuardrails, stopAfterUpvote } from "./4-guardrails.js";
 import { runLoop } from "./5-loop.js";
+import { createLoginHandler } from "./login-handler.js";
 import type { LoopResult } from "./5-loop.js";
 
 export type VerifyResult = {
@@ -123,12 +124,33 @@ async function runHarnessAttempt(
   model: string
 ): Promise<HarnessExecutionResult> {
   const session = new BrowserSession();
+  let upvotedStory: { id: string; title?: string; rank?: number } | null = null;
+  let storiesData: any[] = [];
+  
   await session.open();
-
+  
   try {
-    const tools = createTools(session);
+    const tools = createTools(session, {
+      onUpvoteSuccess: (storyId) => {
+        const story = storiesData.find((s) => s.id === storyId);
+        upvotedStory = story
+          ? { id: storyId, title: story.title, rank: story.rank }
+          : { id: storyId };
+        console.log(`\n[harness] Upvote successful for story ID ${storyId} - forcing completion\n`);
+      },
+      onStoriesLoaded: (stories) => {
+        storiesData = stories;
+      },
+    });
+
+    const guardrails = combineGuardrails(
+      stopAfterUpvote(() => upvotedStory),
+      defaultGuardrails
+    );
+
     const messages = createContext(task);
-    const result = await runLoop(model, messages, defaultGuardrails, tools);
+    const loginHandler = createLoginHandler(session);
+    const result = await runLoop(model, messages, guardrails, tools, loginHandler);
     return { task, model, ...result };
   } finally {
     await session.close();

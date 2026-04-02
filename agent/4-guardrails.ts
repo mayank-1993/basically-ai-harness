@@ -32,6 +32,19 @@ export function combineGuardrails(...fns: GuardrailFn[]): GuardrailFn {
   };
 }
 
+export const stopAfterUpvote =
+  (getUpvotedStory: () => { id: string; title?: string; rank?: number } | null): GuardrailFn =>
+  () => {
+    const story = getUpvotedStory();
+    if (story) {
+      const storyInfo = story.title && story.rank
+        ? `"${story.title}" (rank ${story.rank})`
+        : `story ID ${story.id}`;
+      return { ok: false, reason: `Successfully upvoted ${storyInfo}` };
+    }
+    return { ok: true };
+  };
+
 export const defaultGuardrails = combineGuardrails(
   maxIterations(15),
   maxMessages(50)
