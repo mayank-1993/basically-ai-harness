@@ -56,14 +56,14 @@ export async function runHarness(
 }
 
 export function verifySuccessfulUpvote(result: HarnessExecutionResult): VerifyResult {
-  const successfulUpvote = result.trace
-    .flatMap((iteration) => iteration.toolEvents)
-    .find(
-      (event) =>
-        event.tool === "browser_click" &&
-        /up_/.test(JSON.stringify(event.args)) &&
-        /news\.ycombinator\.com\/(news)?$/.test(event.result.split("now at ")[1]?.trim() ?? "")
-    );
+  const events = result.trace.flatMap((iteration) => iteration.toolEvents);
+
+  const successfulUpvote = events.find(
+    (event) =>
+      event.tool === "browser_click" &&
+      /up_/.test(JSON.stringify(event.args)) &&
+      /news\.ycombinator\.com\/(news)?$/.test(event.result.split("now at ")[1]?.trim() ?? "")
+  );
 
   if (successfulUpvote) {
     return {
@@ -72,13 +72,22 @@ export function verifySuccessfulUpvote(result: HarnessExecutionResult): VerifyRe
     };
   }
 
-  const failedLogin = result.trace
-    .flatMap((iteration) => iteration.toolEvents)
-    .find(
-      (event) =>
-        event.tool === "harness_auto_login" &&
-        event.result.startsWith("Harness failed to handle login at ")
-    );
+  // Click bounced through the login wall: HN's /vote?id=NNN&how=up&goto=...
+  // URL has the side effect of completing the vote once the login handler
+  // submits credentials. Treat that pair as a successful upvote.
+  const upvoteViaLogin = findUpvoteCompletedViaLogin(events);
+  if (upvoteViaLogin) {
+    return {
+      passed: true,
+      reason: `Upvote completed via login redirect for story ID ${upvoteViaLogin}`,
+    };
+  }
+
+  const failedLogin = events.find(
+    (event) =>
+      event.tool === "harness_auto_login" &&
+      event.result.startsWith("Harness failed to handle login at ")
+  );
 
   if (failedLogin) {
     return {
@@ -88,13 +97,11 @@ export function verifySuccessfulUpvote(result: HarnessExecutionResult): VerifyRe
     };
   }
 
-  const unrecoveredLoginRedirect = result.trace
-    .flatMap((iteration) => iteration.toolEvents)
-    .find(
-      (event) =>
-        event.tool !== "harness_auto_login" &&
-        isLoginUrl(extractUrl(event.result))
-    );
+  const unrecoveredLoginRedirect = events.find(
+    (event) =>
+      event.tool !== "harness_auto_login" &&
+      isLoginUrl(extractUrl(event.result))
+  );
 
   if (unrecoveredLoginRedirect) {
     return {
@@ -108,6 +115,26 @@ export function verifySuccessfulUpvote(result: HarnessExecutionResult): VerifyRe
     passed: false,
     reason: "No successful upvote click found in trace",
   };
+}
+
+function findUpvoteCompletedViaLogin(events: { tool: string; args: Record<string, unknown>; result: string }[]): string | null {
+  for (let i = 0; i < events.length; i++) {
+    const event = events[i];
+    if (event.tool !== "browser_click") continue;
+    const selector = JSON.stringify(event.args);
+    const upvoteMatch = selector.match(/up_(\d+)/);
+    if (!upvoteMatch) continue;
+    const landedAt = event.result.split("now at ")[1]?.trim() ?? "";
+    if (!/\/vote\?[^#]*\bid=\d+[^#]*\bhow=up\b/.test(landedAt)) continue;
+
+    const followedByLogin = events.slice(i + 1).some(
+      (next) =>
+        next.tool === "harness_auto_login" &&
+        next.result.startsWith("Harness automatically handled login at ")
+    );
+    if (followedByLogin) return upvoteMatch[1];
+  }
+  return null;
 }
 
 function extractUrl(result: string): string | null {
@@ -130,14 +157,17 @@ async function runHarnessAttempt(
   await session.open();
   
   try {
+    const recordUpvoteSuccess = (storyId: string, source: "click" | "login") => {
+      const story = storiesData.find((s) => s.id === storyId);
+      upvotedStory = story
+        ? { id: storyId, title: story.title, rank: story.rank }
+        : { id: storyId };
+      const via = source === "login" ? " via login redirect" : "";
+      console.log(`\n[harness] Upvote successful${via} for story ID ${storyId} - forcing completion\n`);
+    };
+
     const tools = createTools(session, {
-      onUpvoteSuccess: (storyId) => {
-        const story = storiesData.find((s) => s.id === storyId);
-        upvotedStory = story
-          ? { id: storyId, title: story.title, rank: story.rank }
-          : { id: storyId };
-        console.log(`\n[harness] Upvote successful for story ID ${storyId} - forcing completion\n`);
-      },
+      onUpvoteSuccess: (storyId) => recordUpvoteSuccess(storyId, "click"),
       onStoriesLoaded: (stories) => {
         storiesData = stories;
       },
@@ -149,7 +179,9 @@ async function runHarnessAttempt(
     );
 
     const messages = createContext(task);
-    const loginHandler = createLoginHandler(session);
+    const loginHandler = createLoginHandler(session, {
+      onUpvoteSuccess: (storyId) => recordUpvoteSuccess(storyId, "login"),
+    });
     const result = await runLoop(model, messages, guardrails, tools, loginHandler);
     return { task, model, ...result };
   } finally {
