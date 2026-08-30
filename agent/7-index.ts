@@ -4,7 +4,7 @@ import { runLoop } from "./5-loop.js";
 import { BrowserSession } from "./browser.js";
 
 // try a shitty model
-const MODEL = "openai/gpt-3.5-turbo-0613";
+const MODEL = "gpt-3.5-turbo";
 
 const TASK = `
 Upvote a story on Hacker News.

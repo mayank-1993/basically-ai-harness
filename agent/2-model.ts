@@ -1,8 +1,12 @@
 import OpenAI from "openai";
 import "dotenv/config";
 
-// OpenRouter is OpenAI-compatible. We just swap the baseURL.
-export const client = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY,
-});
+const apiKey = process.env.OPENAI_API_KEY;
+
+if (!apiKey) {
+  throw new Error(
+    "OPENAI_API_KEY is missing. Copy .env.example to .env and add a key from https://platform.openai.com/api-keys",
+  );
+}
+
+export const client = new OpenAI({ apiKey });

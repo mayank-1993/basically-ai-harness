@@ -14,11 +14,11 @@ import { scoreContains } from "./3-scorers.js";
 import { runEval } from "./4-runner.js";
 import type { EvalRun } from "./4-runner.js";
 
-// Swap any OpenRouter model ID here
+// Swap any OpenAI model ID here
 const MODELS = [
-  "ibm-granite/granite-4.0-h-micro",
-  "anthropic/claude-haiku-4-5",
-  "arcee-ai/trinity-large-preview:free",
+  "gpt-4o-mini",
+  "gpt-4o",
+  "gpt-3.5-turbo",
 ];
 
 function printRun(run: EvalRun): void {
