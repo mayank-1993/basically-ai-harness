@@ -1,6 +1,8 @@
 # mini-ai-harness
 
-A minimal TypeScript implementation of two kinds of AI harness, built for a talk on **harness engineering** at AI Engineer World's Fair.
+A minimal TypeScript implementation of two kinds of AI harness, built for a talk on **harness engineering** at AI Engineer Europe 2026.
+
+Read the full write-up, with every step explained: [What Is an Agent Harness?](https://tej.as/blog/what-is-an-agent-harness). Watch the talk: [Harnesses in AI: A Deep Dive](https://www.youtube.com/watch?v=C_GG5g38vLU).
 
 ---
 
