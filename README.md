@@ -72,7 +72,7 @@ dataset → model → scorer → pass/fail → summary
 | File | Part | What it does |
 |---|---|---|
 | `1-dataset.ts` | Dataset | Fixed test cases with known expected outputs. Designed to trigger common hallucinations — the "obvious" answer is usually wrong. |
-| `2-model.ts` | Model | Calls any OpenRouter model with a prompt, returns a string. |
+| `2-model.ts` | Model | Calls any OpenAI model with a prompt, returns a string. |
 | `3-scorers.ts` | Scorers | `exactMatch`, `contains`, `keywords` — normalizes number words ("Three" → "3") before comparing. |
 | `4-runner.ts` | Runner | Loops over cases, scores each, tracks whether the model fell for the trap answer. |
 | `5-index.ts` | Output | Runs multiple models against the same dataset, prints side-by-side comparison. |
@@ -90,7 +90,7 @@ task → [tools + context + guardrails + loop + verify] → result
 | File | Part | What it does |
 |---|---|---|
 | `1-tools.ts` | Tool registry | `createTools(session)` — tools are bound to the environment the harness provides, not a global they reach into. |
-| `2-model.ts` | Model client | OpenRouter via the OpenAI SDK. Swap models by changing one string. |
+| `2-model.ts` | Model client | OpenAI SDK. Swap models by changing one string. |
 | `3-context.ts` | Context / state | Builds initial context, trims old messages to prevent context rot. |
 | `4-guardrails.ts` | Guardrails | Composable safety checks (max iterations, max messages) that run before every loop iteration. |
 | `5-loop.ts` | Agent loop | Call model → use tools → feed result back → repeat. Stops when model answers or guardrail fires. |
@@ -162,14 +162,14 @@ Tools don't manage the browser. They don't know about the browser lifecycle. The
 
 ```sh
 cp .env.example .env
-# add your OPENROUTER_API_KEY
+# add your OPENAI_API_KEY
 npm install
 npx playwright install chromium
 npm run eval    # or
 npm run agent
 ```
 
-Get an OpenRouter key at [openrouter.ai](https://openrouter.ai).
+Get an OpenAI key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys).
 
 ---
 
